@@ -22,5 +22,5 @@ spec:
       serviceAccountName: dash-controller-sa
       containers:
         - name: dash-controller
-          image: ghcr.io/pluralsh/dash-controller:0.0.1
+          image: ghcr.io/pluralsh/dash-controller:0.0.2
           imagePullPolicy: Always
