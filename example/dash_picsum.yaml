@@ -7,3 +7,5 @@ spec:
   image: "zreigz/dash-picsum:0.1.0"
   containerPort: 8050
   replicas: 1
+  serviceAnnotations:
+    service.beta.kubernetes.io/aws-load-balancer-internal: "true"
