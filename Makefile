@@ -1,3 +1,5 @@
+# Image URL to use all building/pushing image targets
+IMG ?= dash-controller:latest
 CRD_OPTIONS ?= "crd"
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
@@ -42,8 +44,14 @@ fmt: ## Run go fmt against code.
 vet: ## Run go vet against code.
 	go vet ./...
 
-build: manifests generate
+docker-build: ## Build docker image with the driver.
+	docker build -t ${IMG} .
 
+docker-push: ## Push docker image with the driver.
+	docker push ${IMG}
+
+build: manifests generate fmt vet ## Build controller.
+	go build -o bin/dash-controller cmd/main.go
 
 # go-get-tool will 'go get' any package $2 and install it to $1.
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
