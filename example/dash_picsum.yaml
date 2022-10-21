@@ -1,0 +1,9 @@
+apiVersion: dash.plural.sh/v1alpha1
+kind: DashApplication
+metadata:
+  name: picsum
+  namespace: default
+spec:
+  image: "zreigz/dash-picsum:0.1.0"
+  containerPort: 8050
+  replicas: 1

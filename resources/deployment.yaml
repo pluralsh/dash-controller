@@ -1,0 +1,26 @@
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: dash-controller
+  labels:
+    dash.plural.sh/name: dash-controller
+spec:
+  replicas: 1
+  strategy:
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      dash.plural.sh/name: dash-controller
+  template:
+    metadata:
+      labels:
+        dash.plural.sh/name: dash-controller
+    spec:
+      serviceAccountName: dash-controller-sa
+      containers:
+        - name: dash-controller
+          image: ghcr.io/pluralsh/dash-controller:0.0.1
+          imagePullPolicy: Always
