@@ -2,6 +2,15 @@
 
 Dash controller is responsible to manage lifecycle of DashApplication objects.
 
+## Local Kubernets
+
+You can spin up kubernetes cluster using kind.
+The following script deploy also load balancer and ingress controller.
+
+```bash
+$ example/kind/run-kind.sh
+```
+
 ## Installation
 
 Install CRD: 

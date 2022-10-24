@@ -11,7 +11,7 @@ rules:
   resources: ["dashapplications", "dashapplications/status"]
   verbs: ["get", "list", "watch", "update", "create", "delete", "patch"]
 - apiGroups: [""]
-  resources: ["events", "services"]
+  resources: ["events", "services", "ingresses"]
   verbs: ["list", "watch", "create", "update", "patch", "get", "patch"]
 - apiGroups: ["apps"]
   resources: ["deployments"]

@@ -7,6 +7,7 @@ import (
 	dashv1alpha1 "github.com/pluralsh/dash-controller/apis/dash/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -58,6 +59,20 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		}
 	}
 
+	ingress := &networkingv1.Ingress{}
+	if err := r.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, ingress); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return ctrl.Result{}, err
+		}
+		if dashApp.Spec.Ingress != nil {
+			log.Info("create ingress")
+			ingress = genIngress(dashApp)
+			if err := r.Create(ctx, ingress); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+	}
+
 	dashApp.Status.Ready = true
 	if err := r.Status().Update(ctx, dashApp); err != nil {
 		return ctrl.Result{}, err
@@ -76,7 +91,6 @@ func generateService(dashApp *dashv1alpha1.DashApplication) *corev1.Service {
 			Annotations: dashApp.Spec.ServiceAnnotations,
 		},
 		Spec: corev1.ServiceSpec{
-			Type:     "LoadBalancer",
 			Selector: baseAppLabels(dashApp.Name, nil),
 			Ports: []corev1.ServicePort{{
 				Protocol:   corev1.ProtocolTCP,
@@ -86,7 +100,53 @@ func generateService(dashApp *dashv1alpha1.DashApplication) *corev1.Service {
 		},
 	}
 
+	if dashApp.Spec.Ingress == nil {
+		svc.Spec.Type = "LoadBalancer"
+	}
+
 	return svc
+}
+
+func genIngress(dashApp *dashv1alpha1.DashApplication) *networkingv1.Ingress {
+	prefix := networkingv1.PathTypePrefix
+	path := "/"
+	if dashApp.Spec.Ingress.Path != "" {
+		path = dashApp.Spec.Ingress.Path
+	}
+	ingress := &networkingv1.Ingress{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      dashApp.Name,
+			Namespace: dashApp.Namespace,
+			Labels:    baseAppLabels(dashApp.Name, nil),
+		},
+		Spec: networkingv1.IngressSpec{
+			Rules: []networkingv1.IngressRule{
+				{
+					Host: dashApp.Spec.Ingress.Host,
+					IngressRuleValue: networkingv1.IngressRuleValue{
+						HTTP: &networkingv1.HTTPIngressRuleValue{
+							Paths: []networkingv1.HTTPIngressPath{
+								{
+									Path:     path,
+									PathType: &prefix,
+									Backend: networkingv1.IngressBackend{
+										Service: &networkingv1.IngressServiceBackend{
+											Name: dashApp.Name,
+											Port: networkingv1.ServiceBackendPort{
+												Number: 80,
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	return ingress
 }
 
 func genDeployment(dashApp *dashv1alpha1.DashApplication) *appsv1.Deployment {
@@ -109,11 +169,13 @@ func genDeployment(dashApp *dashv1alpha1.DashApplication) *appsv1.Deployment {
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Name:  name,
-							Image: dashApp.Spec.Image,
+							Name:    name,
+							Image:   dashApp.Spec.Container.Image,
+							Args:    dashApp.Spec.Container.Args,
+							Command: dashApp.Spec.Container.Command,
 							Ports: []corev1.ContainerPort{
 								{
-									ContainerPort: dashApp.Spec.ContainerPort,
+									ContainerPort: dashApp.Spec.Container.ContainerPort,
 									Protocol:      corev1.ProtocolTCP,
 									Name:          name,
 								},
