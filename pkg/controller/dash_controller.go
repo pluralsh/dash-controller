@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/go-logr/logr"
 	dashv1alpha1 "github.com/pluralsh/dash-controller/apis/dash/v1alpha1"
@@ -152,6 +153,17 @@ func genIngress(dashApp *dashv1alpha1.DashApplication) *networkingv1.Ingress {
 
 func genDeployment(dashApp *dashv1alpha1.DashApplication) *appsv1.Deployment {
 	name := dashApp.Name
+	var envVars []corev1.EnvVar
+
+	if dashApp.Spec.Ingress != nil && dashApp.Spec.Ingress.Path != "" && dashApp.Spec.Ingress.Path != "/" {
+		envVars = []corev1.EnvVar{
+			{
+				Name:  "DASH_ROUTES_PATHNAME_PREFIX",
+				Value: fmt.Sprintf("%s/", dashApp.Spec.Ingress.Path),
+			},
+		}
+	}
+
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -182,6 +194,7 @@ func genDeployment(dashApp *dashv1alpha1.DashApplication) *appsv1.Deployment {
 									Name:          name,
 								},
 							},
+							Env: envVars,
 						},
 					},
 				},
