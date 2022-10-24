@@ -11,4 +11,5 @@ spec:
     args:
       - "-text=foo"
   ingress:
+    ingressClassName: "nginx"
     path: "/echo"
