@@ -59,12 +59,13 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		}
 	}
 
-	ingress := &networkingv1.Ingress{}
-	if err := r.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, ingress); err != nil {
-		if !apierrors.IsNotFound(err) {
-			return ctrl.Result{}, err
-		}
-		if dashApp.Spec.Ingress != nil {
+	if dashApp.Spec.Ingress != nil {
+		ingress := &networkingv1.Ingress{}
+		if err := r.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, ingress); err != nil {
+			if !apierrors.IsNotFound(err) {
+				return ctrl.Result{}, err
+			}
+
 			log.Info("create ingress")
 			ingress = genIngress(dashApp)
 			if err := r.Create(ctx, ingress); err != nil {
@@ -169,10 +170,11 @@ func genDeployment(dashApp *dashv1alpha1.DashApplication) *appsv1.Deployment {
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Name:    name,
-							Image:   dashApp.Spec.Container.Image,
-							Args:    dashApp.Spec.Container.Args,
-							Command: dashApp.Spec.Container.Command,
+							Name:            name,
+							ImagePullPolicy: corev1.PullAlways,
+							Image:           dashApp.Spec.Container.Image,
+							Args:            dashApp.Spec.Container.Args,
+							Command:         dashApp.Spec.Container.Command,
 							Ports: []corev1.ContainerPort{
 								{
 									ContainerPort: dashApp.Spec.Container.ContainerPort,

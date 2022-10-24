@@ -37,9 +37,12 @@ metadata:
   name: picsum
   namespace: default
 spec:
-  image: "zreigz/dash-picsum:0.1.0"
-  containerPort: 8050
   replicas: 1
+  container:
+    image: "zreigz/dash-picsum:0.1.0"
+    containerPort: 8050
+  ingress:
+    path: "/picsum"
 ```
 
-The controller will create Deployment and Service with the DashApplication name: `picsum`
+The controller will create Deployment, Service and Ingress with the DashApplication name: `picsum`
