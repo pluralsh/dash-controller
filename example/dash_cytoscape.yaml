@@ -1,0 +1,13 @@
+apiVersion: dash.plural.sh/v1alpha1
+kind: DashApplication
+metadata:
+  name: cytoscape
+  namespace: default
+spec:
+  replicas: 1
+  container:
+    image: "jerowe/dash-sample-app-dash-cytoscape-lda:1.0"
+    containerPort: 8050
+  ingress:
+    ingressClassName: "nginx"
+    path: "/cytoscape"
