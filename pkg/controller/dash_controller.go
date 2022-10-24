@@ -117,11 +117,13 @@ func genIngress(dashApp *dashv1alpha1.DashApplication) *networkingv1.Ingress {
 	}
 	ingress := &networkingv1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      dashApp.Name,
-			Namespace: dashApp.Namespace,
-			Labels:    baseAppLabels(dashApp.Name, nil),
+			Name:        dashApp.Name,
+			Namespace:   dashApp.Namespace,
+			Labels:      baseAppLabels(dashApp.Name, nil),
+			Annotations: dashApp.Spec.Ingress.Annotations,
 		},
 		Spec: networkingv1.IngressSpec{
+			IngressClassName: dashApp.Spec.Ingress.IngressClassName,
 			Rules: []networkingv1.IngressRule{
 				{
 					Host: dashApp.Spec.Ingress.Host,
