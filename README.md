@@ -46,3 +46,4 @@ spec:
 ```
 
 The controller will create Deployment, Service and Ingress with the DashApplication name: `picsum`
+When you deployed kind cluster the application will be available on this address: `http://localhost/picsum`
