@@ -12,7 +12,7 @@ rules:
   verbs: ["get", "list", "watch", "update", "create", "delete", "patch"]
 - apiGroups: [""]
   resources: ["events", "services"]
-  verbs: ["list", "watch", "create", "update", "patch", "get", "patch"]
+  verbs: ["list", "watch", "create", "update", "patch", "get", "patch", "delete"]
 - apiGroups: ["apps"]
   resources: ["deployments"]
   verbs: ["get", "list", "watch", "update", "create", "delete", "patch"]
