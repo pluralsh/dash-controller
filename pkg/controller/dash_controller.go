@@ -3,9 +3,11 @@ package controller
 import (
 	"context"
 	"fmt"
+	"reflect"
 
 	"github.com/go-logr/logr"
 	dashv1alpha1 "github.com/pluralsh/dash-controller/apis/dash/v1alpha1"
+	"github.com/pluralsh/dash-controller/pkg/kubernetes"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -14,6 +16,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+)
+
+const (
+	IngressFinalizer    = "pluralsh.dash-controller/ingress-protection"
+	DeploymentFinalizer = "pluralsh.dash-controller/deployment-protection"
+	ServiceFinalizer    = "pluralsh.dash-controller/service-protection"
 )
 
 // Reconciler reconciles a DatabaseRequest object
@@ -36,43 +45,47 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	name := dashApp.Name
 	namespace := dashApp.Namespace
 
-	deployment := &appsv1.Deployment{}
-	if err := r.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, deployment); err != nil {
-		if !apierrors.IsNotFound(err) {
-			return ctrl.Result{}, err
+	if !dashApp.GetDeletionTimestamp().IsZero() {
+		if controllerutil.ContainsFinalizer(dashApp, IngressFinalizer) {
+			log.Info("delete ingress")
+			if err := r.Delete(ctx, &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace}}); err != nil {
+				if !apierrors.IsNotFound(err) {
+					return ctrl.Result{}, err
+				}
+			}
+			kubernetes.TryRemoveFinalizer(ctx, r.Client, dashApp, IngressFinalizer)
 		}
-		log.Info("create deployment")
-		deployment = genDeployment(dashApp)
-		if err := r.Create(ctx, deployment); err != nil {
-			return ctrl.Result{}, err
+		if controllerutil.ContainsFinalizer(dashApp, ServiceFinalizer) {
+			log.Info("delete service")
+			if err := r.Delete(ctx, &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace}}); err != nil {
+				if !apierrors.IsNotFound(err) {
+					return ctrl.Result{}, err
+				}
+			}
+			kubernetes.TryRemoveFinalizer(ctx, r.Client, dashApp, ServiceFinalizer)
 		}
+		if controllerutil.ContainsFinalizer(dashApp, DeploymentFinalizer) {
+			log.Info("delete deployment")
+			if err := r.Delete(ctx, &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace}}); err != nil {
+				if !apierrors.IsNotFound(err) {
+					return ctrl.Result{}, err
+				}
+			}
+			kubernetes.TryRemoveFinalizer(ctx, r.Client, dashApp, DeploymentFinalizer)
+		}
+		return ctrl.Result{}, nil
 	}
 
-	svc := &corev1.Service{}
-	if err := r.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, svc); err != nil {
-		if !apierrors.IsNotFound(err) {
-			return ctrl.Result{}, err
-		}
-		log.Info("create service")
-		svc = generateService(dashApp)
-		if err := r.Create(ctx, svc); err != nil {
-			return ctrl.Result{}, err
-		}
+	if err := r.createUpdateDeployment(ctx, log, dashApp); err != nil {
+		return ctrl.Result{}, err
 	}
 
-	if dashApp.Spec.Ingress != nil {
-		ingress := &networkingv1.Ingress{}
-		if err := r.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, ingress); err != nil {
-			if !apierrors.IsNotFound(err) {
-				return ctrl.Result{}, err
-			}
+	if err := r.createUpdateService(ctx, log, dashApp); err != nil {
+		return ctrl.Result{}, err
+	}
 
-			log.Info("create ingress")
-			ingress = genIngress(dashApp)
-			if err := r.Create(ctx, ingress); err != nil {
-				return ctrl.Result{}, err
-			}
-		}
+	if err := r.createUpdateIngress(ctx, log, dashApp); err != nil {
+		return ctrl.Result{}, err
 	}
 
 	dashApp.Status.Ready = true
@@ -215,6 +228,127 @@ func baseAppLabels(name string, additionalLabels map[string]string) map[string]s
 		labels[k] = v
 	}
 	return labels
+}
+
+func (r *Reconciler) createUpdateIngress(ctx context.Context, log logr.Logger, dashApp *dashv1alpha1.DashApplication) error {
+	if dashApp.Spec.Ingress != nil {
+		update := false
+		name := dashApp.Name
+		namespace := dashApp.Namespace
+		newIngress := genIngress(dashApp)
+		ingress := &networkingv1.Ingress{}
+		if err := r.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, ingress); err != nil {
+			if !apierrors.IsNotFound(err) {
+				return err
+			}
+
+			log.Info("create ingress")
+			if err := r.Create(ctx, newIngress); err != nil {
+				return err
+			}
+			if err := kubernetes.TryAddFinalizer(ctx, r.Client, dashApp, IngressFinalizer); err != nil {
+				return err
+			}
+			return nil
+		}
+		if !reflect.DeepEqual(ingress.Annotations, newIngress.Annotations) {
+			update = true
+			ingress.Annotations = newIngress.Annotations
+		}
+		if !reflect.DeepEqual(ingress.Spec.IngressClassName, newIngress.Spec.IngressClassName) {
+			update = true
+			ingress.Spec.IngressClassName = newIngress.Spec.IngressClassName
+		}
+		if !reflect.DeepEqual(ingress.Spec.Rules[0].Host, newIngress.Spec.Rules[0].Host) {
+			update = true
+			ingress.Spec.Rules[0].Host = newIngress.Spec.Rules[0].Host
+		}
+		if !reflect.DeepEqual(ingress.Spec.Rules[0].HTTP.Paths, newIngress.Spec.Rules[0].HTTP.Paths) {
+			update = true
+			ingress.Spec.Rules[0].HTTP.Paths = newIngress.Spec.Rules[0].HTTP.Paths
+		}
+
+		if update {
+			log.Info("update ingress")
+			return r.Update(ctx, ingress)
+		}
+	}
+	return nil
+}
+
+func (r *Reconciler) createUpdateService(ctx context.Context, log logr.Logger, dashApp *dashv1alpha1.DashApplication) error {
+	name := dashApp.Name
+	namespace := dashApp.Namespace
+	newService := generateService(dashApp)
+	svc := &corev1.Service{}
+	if err := r.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, svc); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return err
+		}
+		log.Info("create service")
+		if err := r.Create(ctx, newService); err != nil {
+			return err
+		}
+		if err := kubernetes.TryAddFinalizer(ctx, r.Client, dashApp, ServiceFinalizer); err != nil {
+			return err
+		}
+		return nil
+	}
+
+	if !reflect.DeepEqual(newService.Annotations, svc.Annotations) {
+		svc.Annotations = newService.Annotations
+		log.Info("update service")
+		return r.Update(ctx, svc)
+	}
+
+	return nil
+}
+
+func (r *Reconciler) createUpdateDeployment(ctx context.Context, log logr.Logger, dashApp *dashv1alpha1.DashApplication) error {
+	var update bool
+	name := dashApp.Name
+	namespace := dashApp.Namespace
+	newDeployment := genDeployment(dashApp)
+	deployment := &appsv1.Deployment{}
+	if err := r.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, deployment); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return err
+		}
+		log.Info("create deployment")
+		if err := r.Create(ctx, newDeployment); err != nil {
+			return err
+		}
+		if err := kubernetes.TryAddFinalizer(ctx, r.Client, dashApp, DeploymentFinalizer); err != nil {
+			return err
+		}
+		return nil
+	}
+
+	if !reflect.DeepEqual(newDeployment.Spec.Replicas, deployment.Spec.Replicas) {
+		deployment.Spec.Replicas = newDeployment.Spec.Replicas
+		update = true
+	}
+	if !reflect.DeepEqual(newDeployment.Spec.Template.Spec.Containers[0].Ports, deployment.Spec.Template.Spec.Containers[0].Ports) {
+		deployment.Spec.Template.Spec.Containers[0].Ports = newDeployment.Spec.Template.Spec.Containers[0].Ports
+		update = true
+	}
+	if !reflect.DeepEqual(newDeployment.Spec.Template.Spec.Containers[0].Image, deployment.Spec.Template.Spec.Containers[0].Image) {
+		deployment.Spec.Template.Spec.Containers[0].Image = newDeployment.Spec.Template.Spec.Containers[0].Image
+		update = true
+	}
+	if !reflect.DeepEqual(newDeployment.Spec.Template.Spec.Containers[0].Command, deployment.Spec.Template.Spec.Containers[0].Command) {
+		deployment.Spec.Template.Spec.Containers[0].Command = newDeployment.Spec.Template.Spec.Containers[0].Command
+		update = true
+	}
+	if !reflect.DeepEqual(newDeployment.Spec.Template.Spec.Containers[0].Args, deployment.Spec.Template.Spec.Containers[0].Args) {
+		deployment.Spec.Template.Spec.Containers[0].Args = newDeployment.Spec.Template.Spec.Containers[0].Args
+		update = true
+	}
+	if update {
+		log.Info("update deployment")
+		return r.Update(ctx, deployment)
+	}
+	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
