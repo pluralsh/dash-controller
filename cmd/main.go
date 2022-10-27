@@ -30,7 +30,10 @@ func init() {
 
 func main() {
 	var enableLeaderElection bool
-
+	var metricsAddr string
+	var probeAddr string
+	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
+	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
@@ -43,10 +46,11 @@ func main() {
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:             scheme,
-		LeaderElection:     enableLeaderElection,
-		LeaderElectionID:   "1237ab00.plural.sh",
-		MetricsBindAddress: "0",
+		Scheme:                 scheme,
+		LeaderElection:         enableLeaderElection,
+		LeaderElectionID:       "1237ab00.plural.sh",
+		MetricsBindAddress:     metricsAddr,
+		HealthProbeBindAddress: probeAddr,
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to create manager")
