@@ -162,6 +162,14 @@ func genIngress(dashApp *dashv1alpha1.DashApplication) *networkingv1.Ingress {
 			},
 		},
 	}
+	if dashApp.Spec.Ingress.TLS != nil {
+		ingress.Spec.TLS = []networkingv1.IngressTLS{
+			{
+				Hosts:      []string{dashApp.Spec.Ingress.TLS.Host},
+				SecretName: dashApp.Spec.Ingress.TLS.SecretName,
+			},
+		}
+	}
 
 	return ingress
 }
