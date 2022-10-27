@@ -41,7 +41,7 @@ type Container struct {
 type Ingress struct {
 	// +optional
 	// Annotations for ingress
-	Annotations map[string]string `json:"serviceAnnotations,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
 	// IngressClassName is the name of an IngressClass cluster resource. Ingress
 	// controller implementations use this field to know whether they should be
 	// serving this Ingress resource, by a transitive connection
