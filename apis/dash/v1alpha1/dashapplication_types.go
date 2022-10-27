@@ -90,16 +90,16 @@ type Ingress struct {
 }
 
 type IngressTLS struct {
-	// Hosts included in the TLS certificate. The values in
+	// Host included in the TLS certificate. The values in
 	// +optional
-	Host string `json:"hosts,omitempty"`
+	Host string `json:"host,omitempty"`
 	// SecretName is the name of the secret used to terminate TLS traffic on
 	// port 443. Field is left optional to allow TLS routing based on SNI
 	// hostname alone. If the SNI host in a listener conflicts with the "Host"
 	// header field used by an IngressRule, the SNI host is used for termination
 	// and value of the Host header is used for routing.
 	// +optional
-	SecretName string `json:"secretName,omitempty" protobuf:"bytes,2,opt,name=secretName"`
+	SecretName string `json:"secretName,omitempty"`
 }
 
 type DashApplicationStatus struct {
