@@ -1,0 +1,15 @@
+apiVersion: dash.plural.sh/v1alpha1
+kind: DashApplication
+metadata:
+  name: echo
+  namespace: dash
+spec:
+  replicas: 1
+  container:
+    image: "hashicorp/http-echo:0.2.3"
+    containerPort: 5678
+    args:
+      - "-text=foo"
+  ingress:
+    ingressClassName: "nginx"
+    path: "/echo"
