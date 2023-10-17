@@ -3,6 +3,7 @@ kind: Deployment
 apiVersion: apps/v1
 metadata:
   name: dash-controller
+  namespace: dash
   labels:
     dash.plural.sh/name: dash-controller
 spec:
