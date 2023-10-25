@@ -28,7 +28,7 @@ metadata:
 subjects:
   - kind: ServiceAccount
     name: dash-controller-sa
-    namespace: default
+    namespace: dash
 roleRef:
   kind: ClusterRole
   name: dash-controller-role
