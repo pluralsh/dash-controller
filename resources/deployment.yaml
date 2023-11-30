@@ -4,6 +4,8 @@ apiVersion: apps/v1
 metadata:
   name: dash-controller
   namespace: dash
+  annotations:
+    config.kubernetes.io/depends-on: dash.plural.sh/namespaces/dash/DashApplication/picsum,dash.plural.sh/namespaces/dash/DashApplication/cytoscape,dash.plural.sh/namespaces/dash/DashApplication/echo
   labels:
     dash.plural.sh/name: dash-controller
 spec:
